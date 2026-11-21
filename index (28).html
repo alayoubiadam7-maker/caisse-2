@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="no-referrer">
+<title>Caisse | Corpus Clinic</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2A211B">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Caisse">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Connexion -->
+<main class="ecran connexion" id="ecran-connexion">
+  <form class="carte-connexion" id="form-connexion" novalidate>
+    <img class="logo-connexion" src="logo-fonce.png" alt="" width="72" height="72">
+    <h1>Caisse</h1>
+    <p class="doux">Corpus Clinic, Sousse</p>
+    <label for="code">Code d'accès</label>
+    <input id="code" name="code" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required>
+    <button type="submit" class="bouton plein" id="bouton-connexion">Se connecter</button>
+    <p class="message" id="message-connexion" role="alert" hidden></p>
+    <div class="installer" id="bloc-installer" hidden>
+      <button type="button" class="bouton contour" id="installer">Installer l'application</button>
+    </div>
+    <p class="doux petit installer" id="astuce-ios" hidden>Pour l'installer sur iPhone : touchez le bouton Partager de Safari, puis « Sur l'écran d'accueil ».</p>
+  </form>
+</main>
+
+<!-- Face ID (direction) -->
+<main class="ecran connexion" id="ecran-faceid" hidden>
+  <div class="carte-connexion">
+    <img class="logo-connexion" src="logo-fonce.png" alt="" width="72" height="72">
+    <h1 id="faceid-titre">Face ID</h1>
+    <p class="doux" id="faceid-texte"></p>
+    <button type="button" class="bouton plein" id="bouton-faceid">Déverrouiller avec Face ID</button>
+    <p class="message" id="message-faceid" role="alert" hidden></p>
+    <button type="button" class="lien" id="faceid-retour">Retour</button>
+  </div>
+</main>
+
+<!-- Application -->
+<div class="ecran app" id="ecran-app" hidden>
+  <header class="barre">
+    <div class="barre-marque">
+      <img src="logo-clair.png" alt="" width="36" height="36">
+      <span><b>CORPUS</b>CLINIC</span>
+      <span class="role" id="role"></span>
+    </div>
+    <nav class="onglets" id="onglets" aria-label="Sections" hidden>
+      <button type="button" class="onglet" data-vue="tableau" aria-pressed="true">Tableau de bord</button>
+      <button type="button" class="onglet" data-vue="saisie" aria-pressed="false">Saisir un paiement</button>
+    </nav>
+    <button type="button" class="lien-barre" id="deconnexion">Se déconnecter</button>
+  </header>
+
+  <!-- Saisie (secrétaire, et direction si besoin) -->
+  <main class="contenu" id="vue-saisie" hidden>
+    <form class="carte" id="form-paiement" novalidate>
+      <h2>Nouveau paiement</h2>
+      <label class="etiquette" for="montant">Montant</label>
+      <div class="champ-montant">
+        <input id="montant" name="montant" type="text" inputmode="decimal" autocomplete="off" placeholder="0" required>
+        <span>DT</span>
+      </div>
+      <fieldset>
+        <legend class="etiquette">Soin</legend>
+        <div class="choix" id="choix-soin"></div>
+      </fieldset>
+      <fieldset>
+        <legend class="etiquette">Mode de paiement</legend>
+        <div class="choix" id="choix-mode"></div>
+      </fieldset>
+      <button type="submit" class="bouton plein grand" id="bouton-enregistrer">Enregistrer le paiement</button>
+      <p class="message" id="message-paiement" role="status" hidden></p>
+    </form>
+
+    <section class="carte">
+      <div class="titre-ligne">
+        <h2>Paiements d'aujourd'hui</h2>
+        <button type="button" class="lien" id="actualiser-jour">Actualiser</button>
+      </div>
+      <ul class="liste" id="liste-jour"></ul>
+    </section>
+  </main>
+
+  <!-- Tableau de bord (direction) -->
+  <main class="contenu large" id="vue-tableau" hidden>
+    <div class="filtres">
+      <div class="segments" role="group" aria-label="Période">
+        <button type="button" class="segment" data-periode="jour" aria-pressed="true">Jour</button>
+        <button type="button" class="segment" data-periode="mois" aria-pressed="false">Mois</button>
+        <button type="button" class="segment" data-periode="annee" aria-pressed="false">Année</button>
+      </div>
+      <div class="navigation">
+        <button type="button" class="fleche" id="precedent" aria-label="Période précédente">‹</button>
+        <span class="libelle-periode" id="libelle-periode"></span>
+        <button type="button" class="fleche" id="suivant" aria-label="Période suivante">›</button>
+        <button type="button" class="lien" id="aujourdhui">Aujourd'hui</button>
+      </div>
+      <button type="button" class="bouton contour" id="exporter">Télécharger (CSV)</button>
+    </div>
+
+    <p class="message" id="message-tableau" role="status" hidden></p>
+
+    <section class="chiffres">
+      <div class="chiffre principal">
+        <span class="chiffre-libelle">Total encaissé</span>
+        <span class="chiffre-valeur" id="total">–</span>
+      </div>
+      <div class="chiffre">
+        <span class="chiffre-libelle">Paiements</span>
+        <span class="chiffre-valeur" id="nombre">–</span>
+      </div>
+      <div class="chiffre">
+        <span class="chiffre-libelle">Panier moyen</span>
+        <span class="chiffre-valeur" id="moyen">–</span>
+      </div>
+      <div class="chiffre">
+        <span class="chiffre-libelle">Annulés</span>
+        <span class="chiffre-valeur" id="annules">–</span>
+      </div>
+    </section>
+
+    <section class="carte">
+      <h2 id="titre-serie">Encaissements</h2>
+      <div class="graphique" id="graphique" role="img" aria-label=""></div>
+    </section>
+
+    <div class="deux-colonnes">
+      <section class="carte">
+        <h2>Par mode de paiement</h2>
+        <ul class="barres" id="par-mode"></ul>
+      </section>
+      <section class="carte">
+        <h2>Par soin</h2>
+        <ul class="barres" id="par-soin"></ul>
+      </section>
+    </div>
+
+    <section class="carte" id="bloc-mois" hidden>
+      <h2>Mois par mois</h2>
+      <p class="doux petit aide">Touchez un mois pour voir son détail jour par jour.</p>
+      <div class="tableau-defile">
+        <table class="tableau">
+          <thead><tr><th scope="col">Mois</th><th scope="col" class="nombre">Paiements</th><th scope="col" class="nombre">Total</th><th scope="col" class="nombre">Panier moyen</th><th scope="col" class="nombre">Par rapport au mois d'avant</th><th scope="col" class="nombre">Part de l'année</th><th scope="col" class="nombre">Annulés</th></tr></thead>
+          <tbody id="mois-corps"></tbody>
+          <tfoot id="mois-pied"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="carte" id="bloc-croise" hidden>
+      <div class="titre-ligne">
+        <h2 id="titre-croise">Chaque soin, mois par mois</h2>
+        <div class="segments" role="group" aria-label="Analyser par">
+          <button type="button" class="segment croise" data-croise="soin" aria-pressed="true">Soins</button>
+          <button type="button" class="segment croise" data-croise="mode" aria-pressed="false">Modes de paiement</button>
+        </div>
+      </div>
+      <p class="doux petit aide">Plus la case est foncée, plus le montant est élevé.</p>
+      <div class="tableau-defile">
+        <table class="tableau croise-table">
+          <thead id="croise-tete"></thead>
+          <tbody id="croise-corps"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="carte" id="bloc-detail">
+      <h2>Détail des paiements</h2>
+      <div class="tableau-defile">
+        <table class="tableau">
+          <thead><tr><th scope="col">Date</th><th scope="col">Soin</th><th scope="col">Mode</th><th scope="col">Saisi par</th><th scope="col" class="nombre">Montant</th><th scope="col"><span class="invisible">Action</span></th></tr></thead>
+          <tbody id="detail"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="carte securite" id="bloc-securite" hidden>
+      <h2>Face ID</h2>
+      <p class="doux" id="texte-securite"></p>
+      <button type="button" class="bouton contour" id="ajouter-appareil">Ajouter cet appareil</button>
+      <p class="message" id="message-securite" role="status" hidden></p>
+    </section>
+  </main>
+</div>
+
+<div class="infobulle" id="infobulle" role="tooltip" hidden></div>
+
+<!-- Fenêtre d'annulation -->
+<div class="voile" id="voile-annulation" hidden>
+  <form class="carte fenetre" id="form-annulation" role="dialog" aria-modal="true" aria-labelledby="titre-annulation" novalidate>
+    <h2 id="titre-annulation">Annuler ce paiement ?</h2>
+    <p id="resume-annulation"></p>
+    <label class="etiquette" for="motif">Motif (facultatif)</label>
+    <input id="motif" type="text" maxlength="120" placeholder="Ex. erreur de montant">
+    <p class="doux petit">Le paiement reste visible, marqué « annulé », et n'est plus compté dans les totaux.</p>
+    <div class="actions">
+      <button type="button" class="bouton contour" id="garder">Garder</button>
+      <button type="submit" class="bouton danger" id="confirmer-annulation">Annuler le paiement</button>
+    </div>
+  </form>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
