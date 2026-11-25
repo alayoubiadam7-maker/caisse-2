@@ -8,7 +8,7 @@
   if (window.top !== window.self) { document.documentElement.textContent = ''; return; }
 
   var $ = function (id) { return document.getElementById(id); };
-  var etat = { jeton: '', role: '', soins: [], modes: [], periode: 'jour', date: aujourdhuiISO(), resume: null };
+  var etat = { jeton: '', role: '', soins: [], modes: [], colonnes: [], therapeute: 'Rania', periode: 'jour', date: aujourdhuiISO(), resume: null, grilleMois: aujourdhuiISO().slice(0, 7), grille: [] };
   var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   var MOIS_LONG = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var MESSAGES = {
@@ -17,6 +17,8 @@
     session: 'Votre session a expiré. Reconnectez-vous.',
     montant: 'Montant invalide. Écrivez un nombre, par exemple 120 ou 80,500.',
     soin: 'Choisissez un soin.',
+    nombre: 'Nombre de séances invalide (de 1 à 50).',
+    jour: 'Ce jour ne peut pas être modifié.',
     mode: 'Choisissez un mode de paiement.',
     interdit: "Cette action n'est pas autorisée avec ce code.",
     introuvable: 'Ce paiement est introuvable. Actualisez la liste.',
@@ -99,13 +101,13 @@
 
   var attente = null;   // session direction en attente de Face ID
   function ouvrirFaceID(r) {
-    attente = { jeton: r.jeton, etape: r.etape, defi: r.defi, appareils: r.appareils || [], soins: r.soins, modes: r.modes, recu: Date.now() };
+    attente = { jeton: r.jeton, etape: r.etape, defi: r.defi, appareils: r.appareils || [], soins: r.soins, modes: r.modes, colonnes: r.colonnes, therapeute: r.therapeute, nom: r.nom, recu: Date.now() };
     etat.jeton = r.jeton;
     dire('message-connexion', ''); dire('message-faceid', '');
     var premiere = r.etape === 'inscription';
     $('faceid-titre').textContent = premiere ? 'Activer Face ID' : 'Face ID';
     $('faceid-texte').textContent = premiere
-      ? "Première connexion de la direction. Activez Face ID sur ce téléphone : ensuite, il faudra le code et votre visage pour voir les montants."
+      ? "Première connexion avec ce code. Activez Face ID sur ce téléphone : ensuite, il faudra le code et votre visage pour voir les montants."
       : 'Confirmez avec votre visage pour ouvrir le tableau de bord.';
     $('bouton-faceid').textContent = premiere ? 'Activer Face ID' : 'Déverrouiller avec Face ID';
     $('ecran-connexion').hidden = true; $('ecran-faceid').hidden = false;
@@ -163,7 +165,7 @@
     }).then(function (r) {
       b.disabled = false;
       if (!r.ok) throw r;
-      var s = { jeton: a.jeton, role: 'direction', soins: a.soins, modes: a.modes };
+      var s = { jeton: a.jeton, role: 'direction', nom: r.nom || a.nom, soins: a.soins, modes: a.modes, colonnes: a.colonnes, therapeute: a.therapeute };
       attente = null;
       $('ecran-faceid').hidden = true;
       demarrer(s);
@@ -179,15 +181,20 @@
 
   function demarrer(r) {
     etat.jeton = r.jeton; etat.role = r.role; etat.soins = r.soins || []; etat.modes = r.modes || [];
-    memoriser('caisse-session', JSON.stringify({ jeton: r.jeton, role: r.role, soins: etat.soins, modes: etat.modes }));
+    etat.colonnes = r.colonnes || etat.soins.map(function (c) { return { cle: c, groupe: 'Soins' }; });
+    etat.therapeute = r.therapeute || 'Rania';
+    memoriser('caisse-session', JSON.stringify({ jeton: r.jeton, role: r.role, nom: r.nom, soins: etat.soins, modes: etat.modes, colonnes: etat.colonnes, therapeute: etat.therapeute }));
     dire('message-connexion', '');
     $('ecran-connexion').hidden = true; $('ecran-app').hidden = false;
-    $('role').textContent = r.role === 'direction' ? 'Direction' : 'Secrétaire';
-    construireChoix('choix-soin', 'soin', etat.soins);
-    construireChoix('choix-mode', 'mode', etat.modes);
+    $('role').textContent = r.nom || (r.role === 'direction' ? 'Direction' : 'Secrétaire');
+    construireChoix('choix-mode-case', 'mode-case', etat.modes);
+    $('libelle-part').textContent = 'Part de ' + etat.therapeute;
     $('onglets').hidden = r.role !== 'direction';
     $('bloc-securite').hidden = r.role !== 'direction';
-    afficherVue(r.role === 'direction' ? 'tableau' : 'saisie');
+    $('filtres-grille').hidden = r.role !== 'direction';
+    $('bloc-jour').hidden = r.role === 'direction';
+    etat.grilleMois = aujourdhuiISO().slice(0, 7);
+    afficherVue('grille');
     if (r.role === 'direction') chargerSecurite();
   }
 
@@ -227,23 +234,21 @@
     etat.jeton = ''; etat.role = ''; etat.resume = null; attente = null;
     memoriser('caisse-session', '');
     $('ecran-app').hidden = true; $('ecran-faceid').hidden = true; $('ecran-connexion').hidden = false;
-    vider($('liste-jour')); vider($('detail'));
+    vider($('liste-jour')); vider($('detail')); vider($('grille-tete')); vider($('grille-corps')); vider($('grille-pied'));
+    $('voile-case').hidden = true; document.body.classList.remove('fige');
     dire('message-connexion', message || '', message ? 'erreur' : '');
     $('code').focus();
   }
   $('deconnexion').addEventListener('click', function () { deconnecter(''); });
 
-  // Reprend la session ouverte dans cet onglet (elle se ferme avec l'onglet).
-  (function () {
-    try { var s = JSON.parse(relire('caisse-session') || 'null'); if (s && s.jeton && (s.role === 'direction' || s.role === 'secretaire')) demarrer(s); } catch (e) {}
-  })();
 
   // ----- Navigation -----
   function afficherVue(vue) {
-    $('vue-saisie').hidden = vue !== 'saisie';
+    $('vue-grille').hidden = vue !== 'grille';
     $('vue-tableau').hidden = vue !== 'tableau';
     Array.prototype.forEach.call(document.querySelectorAll('.onglet'), function (o) { o.setAttribute('aria-pressed', String(o.getAttribute('data-vue') === vue)); });
-    if (vue === 'saisie') { chargerJour(); setTimeout(function () { $('montant').focus(); }, 50); }
+    window.scrollTo(0, 0);
+    if (vue === 'grille') chargerGrille();
     else chargerResume();
   }
   Array.prototype.forEach.call(document.querySelectorAll('.onglet'), function (o) {
@@ -261,48 +266,14 @@
   }
   function choisi(nom) { var i = document.querySelector('input[name="' + nom + '"]:checked'); return i ? i.value : ''; }
 
-  var cleEnvoi = '';
-  $('form-paiement').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var montant = $('montant').value.replace(/\s/g, '').replace(',', '.');
-    if (!/^\d{1,6}(\.\d{1,3})?$/.test(montant) || Number(montant) <= 0) return dire('message-paiement', MESSAGES.montant);
-    var soin = choisi('soin'), mode = choisi('mode');
-    if (!soin) return dire('message-paiement', MESSAGES.soin);
-    if (!mode) return dire('message-paiement', MESSAGES.mode);
-    // Même clé si on renvoie le même formulaire : le paiement n'est jamais compté deux fois.
-    cleEnvoi = cleEnvoi || cleAleatoire();
-    var b = $('bouton-enregistrer'); b.disabled = true; b.textContent = 'Enregistrement…';
-    appel({ action: 'ajouter', montant: montant, soin: soin, mode: mode, cle: cleEnvoi }).then(function (r) {
-      b.disabled = false; b.textContent = 'Enregistrer le paiement';
-      if (!r.ok) return dire('message-paiement', texteErreur(r));
-      cleEnvoi = '';
-      $('form-paiement').reset();
-      dire('message-paiement', 'Enregistré : ' + dt(r.paiement.montant) + ', ' + r.paiement.soin + ', ' + r.paiement.mode.toLowerCase() + '.', 'succes');
-      chargerJour();
-      $('montant').focus();
-    });
-  });
-  // Toute modification du formulaire en fait un nouveau paiement.
-  $('form-paiement').addEventListener('input', function () { cleEnvoi = ''; });
-  $('form-paiement').addEventListener('change', function () { cleEnvoi = ''; });
-
-  function chargerJour() {
-    var ul = $('liste-jour');
-    appel({ action: 'aujourdhui' }).then(function (r) {
-      vider(ul);
-      if (!r.ok) { ul.appendChild(el('li', 'vide', texteErreur(r))); return; }
-      if (!r.paiements.length) { ul.appendChild(el('li', 'vide', "Aucun paiement enregistré aujourd'hui.")); return; }
-      r.paiements.forEach(function (p) { ul.appendChild(lignePaiement(p)); });
-    });
-  }
-  $('actualiser-jour').addEventListener('click', chargerJour);
+  $('actualiser-jour').addEventListener('click', function () { chargerGrille(); });
 
   function lignePaiement(p) {
     var li = el('li', p.annule ? 'annule' : '');
     li.appendChild(el('span', 'heure', p.quand.slice(11, 16)));
     var q = el('div', 'quoi');
     q.appendChild(el('strong', '', dt(p.montant)));
-    q.appendChild(el('span', '', p.soin + ' · ' + p.mode));
+    q.appendChild(el('span', '', p.soin + (p.soin === 'Adhérent' ? '' : ' ' + p.nombre + '(' + fmt.format(p.prix) + ')') + ' · ' + p.mode));
     li.appendChild(q);
     if (p.annule) li.appendChild(el('span', 'etiquette-annule', 'Annulé'));
     else {
@@ -313,6 +284,283 @@
     }
     return li;
   }
+
+  // ----- Tableau de caisse : une ligne par jour, une colonne par soin (comme la feuille Google) -----
+  var demandeGrille = 0;
+  function nombreJours(mois) { var p = mois.split('-').map(Number); return new Date(Date.UTC(p[0], p[1], 0)).getUTCDate(); }
+  function jourSemaine(iso) { var p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); }
+  function libelleJour(iso) {
+    var p = iso.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+    var j = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', timeZone: 'UTC' }).format(d);
+    return j.charAt(0).toUpperCase() + j.slice(1) + ' ' + p[2] + ' ' + MOIS_LONG[p[1] - 1];
+  }
+  function libelleMois(m) { var p = m.split('-').map(Number), n = MOIS_LONG[p[1] - 1]; return n.charAt(0).toUpperCase() + n.slice(1) + ' ' + p[0]; }
+  function nombreCourt(n) { return fmt.format(n || 0); }
+  function partsDe(col, montant) {
+    if (!col || !col.partage) return { t: 0, c: montant };
+    var c = Math.floor(montant * 2 / 3 + 1e-9);
+    return { t: Math.round((montant - c) * 1000) / 1000, c: c };
+  }
+
+  function chargerGrille() {
+    var direction = etat.role === 'direction', auj = aujourdhuiISO();
+    if (direction) {
+      $('grille-libelle').textContent = libelleMois(etat.grilleMois);
+      $('grille-suivant').disabled = etat.grilleMois >= auj.slice(0, 7);
+      $('grille-sous-titre').textContent = '';
+    } else {
+      var l = libelleJour(auj);
+      $('grille-sous-titre').textContent = "Aujourd'hui, " + l.charAt(0).toLowerCase() + l.slice(1);
+    }
+    var n = ++demandeGrille;
+    var demande = direction ? { action: 'resume', periode: 'mois', date: etat.grilleMois + '-01' } : { action: 'aujourdhui' };
+    appel(demande).then(function (r) {
+      if (n !== demandeGrille) return;
+      if (!r.ok) { dire('message-grille', texteErreur(r)); return; }
+      etat.grille = r.paiements || [];
+      dessinerGrille();
+      if (!direction) dessinerListeJour();
+    });
+  }
+  $('grille-precedent').addEventListener('click', function () { decalerMois(-1); });
+  $('grille-suivant').addEventListener('click', function () { decalerMois(1); });
+  $('grille-aujourdhui').addEventListener('click', function () { etat.grilleMois = aujourdhuiISO().slice(0, 7); dire('message-grille', ''); chargerGrille(); });
+  function decalerMois(sens) {
+    var p = etat.grilleMois.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1 + sens, 1));
+    etat.grilleMois = d.toISOString().slice(0, 7);
+    dire('message-grille', '');
+    chargerGrille();
+  }
+
+  function dessinerListeJour() {
+    var ul = $('liste-jour'); vider(ul);
+    if (!etat.grille.length) { ul.appendChild(el('li', 'vide', "Aucune saisie aujourd'hui.")); return; }
+    etat.grille.forEach(function (p) { ul.appendChild(lignePaiement(p)); });
+  }
+
+  // Colonnes affichées : celles de la caisse, plus « Autres » pour d'anciens soins s'il y en a.
+  function colonnesAffichees() {
+    var cols = etat.colonnes.slice(), connues = cols.map(function (c) { return c.cle; });
+    if (etat.grille.some(function (p) { return connues.indexOf(p.soin) === -1; })) cols.push({ cle: '__autres', nom: 'Autres', groupe: 'Autres', lecture: true });
+    return cols;
+  }
+  function planColonnes() {
+    var cols = colonnesAffichees(), direction = etat.role === 'direction', plan = [], groupes = [];
+    cols.forEach(function (c, i) {
+      if (groupes.indexOf(c.groupe) === -1) groupes.push(c.groupe);
+      plan.push({ type: 'soin', col: c, groupe: c.groupe });
+      var suivant = cols[i + 1];
+      var partage = cols.some(function (x) { return x.groupe === c.groupe && x.partage; });
+      if (direction && partage && (!suivant || suivant.groupe !== c.groupe)) {
+        plan.push({ type: 'partT', groupe: c.groupe });
+        plan.push({ type: 'partC', groupe: c.groupe });
+      }
+    });
+    plan.forEach(function (x) { x.teinte = 'g' + (groupes.indexOf(x.groupe) % 5); });
+    if (direction) plan.push({ type: 'total', groupe: '', teinte: '' });
+    return plan;
+  }
+  function cleSoin(p, connues) { return connues.indexOf(p.soin) === -1 ? '__autres' : p.soin; }
+
+  function dessinerGrille() {
+    var direction = etat.role === 'direction', auj = aujourdhuiISO();
+    var plan = planColonnes(), connues = etat.colonnes.map(function (c) { return c.cle; });
+    var parCase = {};
+    etat.grille.forEach(function (p) {
+      var k = p.jour + '|' + cleSoin(p, connues);
+      (parCase[k] = parCase[k] || []).push(p);
+    });
+    Object.keys(parCase).forEach(function (k) { parCase[k].sort(function (a, b) { return a.quand < b.quand ? -1 : 1; }); });
+
+    // En-têtes : groupes puis soins
+    var tete = $('grille-tete'); vider(tete);
+    var l1 = el('tr', 'ligne-groupes'), l2 = el('tr', 'ligne-soins');
+    var thJour = el('th', 'col-jour', 'Jour'); thJour.rowSpan = 2; thJour.scope = 'col'; l1.appendChild(thJour);
+    for (var i = 0; i < plan.length; i++) {
+      var x = plan[i];
+      if (x.type === 'total') { var tt = el('th', 'col-total', 'Total'); tt.rowSpan = 2; tt.scope = 'col'; l1.appendChild(tt); continue; }
+      if (i === 0 || plan[i - 1].groupe !== x.groupe || plan[i - 1].type === 'total') {
+        var span = 0; for (var j = i; j < plan.length && plan[j].groupe === x.groupe && plan[j].type !== 'total'; j++) span++;
+        var g = el('th', 'groupe ' + x.teinte, x.groupe); g.colSpan = span; g.scope = 'colgroup'; l1.appendChild(g);
+      }
+      var nom = x.type === 'soin' ? (x.col.nom || x.col.cle) : x.type === 'partT' ? etat.therapeute : 'Corpus';
+      var th = el('th', x.teinte + (x.type === 'soin' ? '' : ' col-part'), nom); th.scope = 'col'; l2.appendChild(th);
+    }
+    tete.appendChild(l1); tete.appendChild(l2);
+
+    // Lignes : le mois entier (direction) ou aujourd'hui (secrétaire)
+    var jours = [];
+    if (direction) for (var d = 1; d <= nombreJours(etat.grilleMois); d++) jours.push(etat.grilleMois + '-' + ('0' + d).slice(-2));
+    else jours.push(auj);
+    var corps = $('grille-corps'); vider(corps);
+    var totaux = plan.map(function () { return { m: 0, n: 0 }; });
+    jours.forEach(function (jour) {
+      var futur = jour > auj, ws = jourSemaine(jour);
+      var tr = el('tr', (futur ? 'futur ' : '') + (ws === 0 ? 'dimanche ' : '') + (jour === auj ? 'aujourdhui' : ''));
+      var thj = el('th', 'col-jour'); thj.scope = 'row';
+      thj.appendChild(el('span', 'jour-num', String(Number(jour.slice(8)))));
+      thj.appendChild(el('span', 'jour-nom', ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][ws]));
+      tr.appendChild(thj);
+      var totalJour = 0, partsJour = {};
+      plan.forEach(function (x, ix) {
+        if (x.type !== 'soin') return;
+        var liste = (parCase[jour + '|' + x.col.cle] || []).filter(function (p) { return !p.annule; });
+        liste.forEach(function (p) {
+          totalJour += p.montant;
+          var pg = partsJour[x.groupe] = partsJour[x.groupe] || { t: 0, c: 0 };
+          if (x.col.partage) { pg.t += p.partT; pg.c += p.partC; }
+          totaux[ix].m += p.montant; totaux[ix].n += x.col.montantSeul ? 0 : p.nombre;
+        });
+      });
+      plan.forEach(function (x, ix) {
+        var td = el('td', x.teinte);
+        if (x.type === 'soin') {
+          var tous = parCase[jour + '|' + x.col.cle] || [];
+          var liste = tous.filter(function (p) { return !p.annule; });
+          var somme = liste.reduce(function (a, p) { return a + p.montant; }, 0);
+          var contenu = el(futur || x.col.lecture ? 'div' : 'button', 'case' + (liste.length ? ' pleine' : ''));
+          if (liste.length) {
+            var det = el('span', 'case-detail');
+            det.textContent = x.col.montantSeul || x.col.lecture
+              ? liste.map(function (p) { return nombreCourt(p.montant); }).join(' + ')
+              : liste.map(function (p) { return p.nombre + '(' + nombreCourt(p.prix) + ')'; }).join(' ');
+            contenu.appendChild(det);
+            contenu.appendChild(el('span', 'case-montant', nombreCourt(somme)));
+          } else if (!futur && !x.col.lecture) contenu.appendChild(el('span', 'case-plus', '+'));
+          if (tous.length > liste.length) contenu.appendChild(el('span', 'case-annule', (tous.length - liste.length) + ' annulé' + (tous.length - liste.length > 1 ? 's' : '')));
+          if (contenu.tagName === 'BUTTON') {
+            contenu.type = 'button';
+            contenu.setAttribute('aria-label', (x.col.nom || x.col.cle) + ', ' + libelleJour(jour) + (liste.length ? ' : ' + dt(somme) : ' : ajouter'));
+            (function (j, c, b) { b.addEventListener('click', function () { ouvrirCase(j, c, b); }); })(jour, x.col, contenu);
+          }
+          td.appendChild(contenu);
+        } else if (x.type === 'partT' || x.type === 'partC') {
+          var pg = partsJour[x.groupe], v = pg ? (x.type === 'partT' ? pg.t : pg.c) : 0;
+          td.className += ' part'; td.textContent = v ? nombreCourt(Math.round(v * 1000) / 1000) : '';
+          totaux[ix].m += v;
+        } else {
+          td.className = 'col-total'; td.textContent = totalJour ? nombreCourt(Math.round(totalJour * 1000) / 1000) : '';
+          totaux[ix].m += totalJour;
+        }
+        tr.appendChild(td);
+      });
+      corps.appendChild(tr);
+    });
+
+    // Ligne des totaux du mois (direction)
+    var pied = $('grille-pied'); vider(pied);
+    if (direction) {
+      var tp = el('tr'), thp = el('th', 'col-jour', 'Total'); thp.scope = 'row'; tp.appendChild(thp);
+      plan.forEach(function (x, ix) {
+        var td = el('td', x.type === 'total' ? 'col-total' : x.teinte);
+        var m = Math.round(totaux[ix].m * 1000) / 1000;
+        if (m) {
+          td.appendChild(el('span', 'pied-montant', nombreCourt(m)));
+          if (x.type === 'soin' && totaux[ix].n) td.appendChild(el('span', 'pied-seances', totaux[ix].n + ' séance' + (totaux[ix].n > 1 ? 's' : '')));
+        }
+        tp.appendChild(td);
+      });
+      pied.appendChild(tp);
+    }
+    // Sur le mois en cours, la ligne du jour est amenée à l'écran.
+    if (direction && etat.grilleMois === auj.slice(0, 7)) {
+      var ligne = corps.querySelector('tr.aujourdhui');
+      var boite = document.querySelector('.grille-defile');
+      if (ligne && boite) boite.scrollTop = Math.max(0, ligne.offsetTop - 120);
+    }
+  }
+
+  // ----- Fenêtre d'une case : détail et ajout -----
+  var caseOuverte = null, cleCase = '', retourCase = null;
+  function dernierPrix(soin) {
+    for (var i = 0; i < etat.grille.length; i++) if (etat.grille[i].soin === soin && !etat.grille[i].annule) return etat.grille[i].prix;
+    try { return JSON.parse(localStorage.getItem('caisse-prix') || '{}')[soin] || null; } catch (e) { return null; }
+  }
+  function retenirPrix(soin, prix) {
+    try { var m = JSON.parse(localStorage.getItem('caisse-prix') || '{}'); m[soin] = prix; localStorage.setItem('caisse-prix', JSON.stringify(m)); } catch (e) {}
+  }
+  function ouvrirCase(jour, col, bouton) {
+    var direction = etat.role === 'direction', auj = aujourdhuiISO();
+    caseOuverte = { jour: jour, col: col }; retourCase = bouton; cleCase = '';
+    $('titre-case').textContent = col.nom || col.cle;
+    $('date-case').textContent = libelleJour(jour) + (jour === auj ? " (aujourd'hui)" : '');
+    var ul = $('liste-case'); vider(ul);
+    var tous = etat.grille.filter(function (p) { return p.jour === jour && p.soin === col.cle; })
+      .sort(function (a, b) { return a.quand < b.quand ? -1 : 1; });
+    tous.forEach(function (p) {
+      var li = el('li', p.annule ? 'annule' : '');
+      li.appendChild(el('span', 'heure', p.quand.slice(11, 16)));
+      var q = el('div', 'quoi');
+      q.appendChild(el('strong', '', col.montantSeul ? dt(p.montant) : p.nombre + ' × ' + dt(p.prix) + ' = ' + dt(p.montant)));
+      q.appendChild(el('span', '', p.mode + ' · ' + p.par + (direction && col.partage && !p.annule ? ' · ' + etat.therapeute + ' ' + dt(p.partT) + ', Corpus ' + dt(p.partC) : '')));
+      li.appendChild(q);
+      if (p.annule) li.appendChild(el('span', 'etiquette-annule', 'Annulé'));
+      else if (direction || jour === auj) {
+        var b = el('button', 'bouton-annuler', 'Annuler'); b.type = 'button';
+        b.setAttribute('aria-label', 'Annuler ' + dt(p.montant) + ' à ' + p.quand.slice(11, 16));
+        b.addEventListener('click', function () { fermerCase(true); demanderAnnulation(p, retourCase); });
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    });
+    ul.hidden = !tous.length;
+    $('ligne-nombre').hidden = !!col.montantSeul;
+    $('label-prix').textContent = col.montantSeul ? 'Montant' : "Prix d'une séance";
+    $('nombre-seances').value = '1';
+    var pr = dernierPrix(col.cle);
+    $('prix').value = pr ? String(pr).replace('.', ',') : '';
+    var premier = document.querySelector('input[name="mode-case"]');
+    if (premier) premier.checked = true;
+    dire('message-case', '');
+    majTotalCase();
+    $('voile-case').hidden = false;
+    document.body.classList.add('fige');
+    setTimeout(function () { $('prix').focus(); if ($('prix').value) $('prix').select(); }, 60);
+  }
+  function fermerCase(sansFocus) {
+    $('voile-case').hidden = true; caseOuverte = null;
+    document.body.classList.remove('fige');
+    if (!sansFocus && retourCase) retourCase.focus();
+  }
+  function lireNombre() { var n = Number($('nombre-seances').value); return /^\d{1,2}$/.test($('nombre-seances').value) && n >= 1 && n <= 50 ? n : 0; }
+  function lirePrix() { var v = $('prix').value.replace(/\s/g, '').replace(',', '.'); return /^\d{1,6}(\.\d{1,3})?$/.test(v) && Number(v) > 0 ? Number(v) : 0; }
+  function majTotalCase() {
+    if (!caseOuverte) return;
+    var col = caseOuverte.col, n = col.montantSeul ? 1 : lireNombre(), pr = lirePrix();
+    if (!n || !pr) { $('total-case').textContent = ''; return; }
+    var m = Math.round(n * pr * 1000) / 1000, t = 'Total : ' + dt(m);
+    if (etat.role === 'direction' && col.partage) { var ps = partsDe(col, m); t += ' (' + etat.therapeute + ' ' + dt(ps.t) + ', Corpus ' + dt(ps.c) + ')'; }
+    $('total-case').textContent = t;
+  }
+  $('moins').addEventListener('click', function () { var n = lireNombre() || 1; $('nombre-seances').value = String(Math.max(1, n - 1)); cleCase = ''; majTotalCase(); });
+  $('plus').addEventListener('click', function () { var n = lireNombre() || 0; $('nombre-seances').value = String(Math.min(50, n + 1)); cleCase = ''; majTotalCase(); });
+  $('form-case').addEventListener('input', function () { cleCase = ''; majTotalCase(); });
+  $('form-case').addEventListener('change', function () { cleCase = ''; });
+  $('fermer-case').addEventListener('click', function () { fermerCase(); });
+  $('voile-case').addEventListener('click', function (e) { if (e.target === $('voile-case')) fermerCase(); });
+  $('voile-case').addEventListener('keydown', function (e) { if (e.key === 'Escape') fermerCase(); });
+  $('form-case').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!caseOuverte) return;
+    var c = caseOuverte, n = c.col.montantSeul ? 1 : lireNombre(), pr = lirePrix(), mode = choisi('mode-case');
+    if (!n) return dire('message-case', MESSAGES.nombre);
+    if (!pr) return dire('message-case', MESSAGES.montant);
+    if (!mode) return dire('message-case', MESSAGES.mode);
+    cleCase = cleCase || cleAleatoire();
+    var params = { action: 'ajouter', soin: c.col.cle, nombre: String(n), prix: String(pr), mode: mode, cle: cleCase };
+    if (c.jour !== aujourdhuiISO()) params.jour = c.jour;
+    var b = $('bouton-ajouter'); b.disabled = true; b.textContent = 'Ajout…';
+    appel(params).then(function (r) {
+      b.disabled = false; b.textContent = 'Ajouter';
+      if (!r.ok) return dire('message-case', texteErreur(r));
+      cleCase = '';
+      retenirPrix(c.col.cle, pr);
+      var p = r.paiement;
+      fermerCase();
+      dire('message-grille', 'Ajouté : ' + p.soin + (c.col.montantSeul ? '' : ' ' + p.nombre + '(' + nombreCourt(p.prix) + ')') + ' = ' + dt(p.montant) + ', ' + p.mode.toLowerCase() + '.', 'succes');
+      chargerGrille();
+    });
+  });
 
   // ----- Annulation -----
   var aAnnuler = null, retourFocus = null;
@@ -332,10 +580,10 @@
     var b = $('confirmer-annulation'); b.disabled = true;
     appel({ action: 'annuler', id: aAnnuler.id, motif: $('motif').value }).then(function (r) {
       b.disabled = false;
-      var vueSaisie = !$('vue-saisie').hidden;
+      var vueGrille = !$('vue-grille').hidden;
       fermerAnnulation();
-      if (!r.ok) return dire(vueSaisie ? 'message-paiement' : 'message-tableau', texteErreur(r));
-      if (vueSaisie) { dire('message-paiement', 'Paiement annulé.', 'succes'); chargerJour(); }
+      if (!r.ok) return dire(vueGrille ? 'message-grille' : 'message-tableau', texteErreur(r));
+      if (vueGrille) { dire('message-grille', 'Paiement annulé.', 'succes'); chargerGrille(); }
       else chargerResume();
     });
   });
@@ -383,6 +631,7 @@
       $('nombre').textContent = String(r.nombre);
       $('moyen').textContent = r.nombre ? dt(Math.round(r.total / r.nombre * 1000) / 1000) : '–';
       $('annules').textContent = String(r.annules);
+      $('part-t').textContent = dt(r.partT);
       dessinerSerie(r);
       dessinerBarres('par-mode', r.parMode, r.total);
       dessinerBarres('par-soin', r.parSoin, r.total);
@@ -609,4 +858,9 @@
   if (ios && !dejaInstallee) $('astuce-ios').hidden = false;
 
   window.addEventListener('resize', function () { if (etat.resume && !$('vue-tableau').hidden) dessinerSerie(etat.resume); });
+
+  // Reprend la session ouverte dans cet onglet (elle se ferme avec l'onglet), une fois tout le code prêt.
+  (function () {
+    try { var s = JSON.parse(relire('caisse-session') || 'null'); if (s && s.jeton && (s.role === 'direction' || s.role === 'secretaire')) demarrer(s); } catch (e) {}
+  })();
 })();

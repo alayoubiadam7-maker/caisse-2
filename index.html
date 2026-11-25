@@ -9,15 +9,12 @@
 <title>Caisse | Corpus Clinic</title>
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#2A211B">
+<meta name="theme-color" content="#F2F2F7">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Caisse">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,7 +22,7 @@
 <!-- Connexion -->
 <main class="ecran connexion" id="ecran-connexion">
   <form class="carte-connexion" id="form-connexion" novalidate>
-    <img class="logo-connexion" src="logo-fonce.png" alt="" width="72" height="72">
+    <img class="app-icone" src="icone-192.png" alt="" width="84" height="84">
     <h1>Caisse</h1>
     <p class="doux">Corpus Clinic, Sousse</p>
     <label for="code">Code d'accès</label>
@@ -42,7 +39,7 @@
 <!-- Face ID (direction) -->
 <main class="ecran connexion" id="ecran-faceid" hidden>
   <div class="carte-connexion">
-    <img class="logo-connexion" src="logo-fonce.png" alt="" width="72" height="72">
+    <svg class="icone-faceid" aria-hidden="true" width="72" height="72" viewBox="0 0 72 72" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V14a8 8 0 0 1 8-8h8M50 6h8a8 8 0 0 1 8 8v8M66 50v8a8 8 0 0 1-8 8h-8M22 66h-8a8 8 0 0 1-8-8v-8"/><path d="M24 26v5M48 26v5M36 26v13h-3"/><path d="M26 47c5.5 5 14.5 5 20 0"/></svg>
     <h1 id="faceid-titre">Face ID</h1>
     <p class="doux" id="faceid-texte"></p>
     <button type="button" class="bouton plein" id="bouton-faceid">Déverrouiller avec Face ID</button>
@@ -55,41 +52,45 @@
 <div class="ecran app" id="ecran-app" hidden>
   <header class="barre">
     <div class="barre-marque">
-      <img src="logo-clair.png" alt="" width="36" height="36">
+      <img src="logo-fonce.png" alt="" width="32" height="32">
       <span><b>CORPUS</b>CLINIC</span>
       <span class="role" id="role"></span>
     </div>
     <nav class="onglets" id="onglets" aria-label="Sections" hidden>
-      <button type="button" class="onglet" data-vue="tableau" aria-pressed="true">Tableau de bord</button>
-      <button type="button" class="onglet" data-vue="saisie" aria-pressed="false">Saisir un paiement</button>
+      <button type="button" class="onglet" data-vue="grille" aria-pressed="true"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M3 15h18M9 4v16"/></svg><span>Tableau</span></button>
+      <button type="button" class="onglet" data-vue="tableau" aria-pressed="false"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V11M10 20V5M16 20v-6M22 20H2"/></svg><span>Analyse</span></button>
     </nav>
     <button type="button" class="lien-barre" id="deconnexion">Se déconnecter</button>
   </header>
 
-  <!-- Saisie (secrétaire, et direction si besoin) -->
-  <main class="contenu" id="vue-saisie" hidden>
-    <form class="carte" id="form-paiement" novalidate>
-      <h2>Nouveau paiement</h2>
-      <label class="etiquette" for="montant">Montant</label>
-      <div class="champ-montant">
-        <input id="montant" name="montant" type="text" inputmode="decimal" autocomplete="off" placeholder="0" required>
-        <span>DT</span>
+  <!-- Tableau de caisse : une ligne par jour, une colonne par soin -->
+  <main class="contenu large" id="vue-grille" hidden>
+    <h1 class="grand-titre">Caisse</h1>
+    <div class="filtres" id="filtres-grille" hidden>
+      <div class="navigation">
+        <button type="button" class="fleche" id="grille-precedent" aria-label="Mois précédent">‹</button>
+        <span class="libelle-periode" id="grille-libelle"></span>
+        <button type="button" class="fleche" id="grille-suivant" aria-label="Mois suivant">›</button>
       </div>
-      <fieldset>
-        <legend class="etiquette">Soin</legend>
-        <div class="choix" id="choix-soin"></div>
-      </fieldset>
-      <fieldset>
-        <legend class="etiquette">Mode de paiement</legend>
-        <div class="choix" id="choix-mode"></div>
-      </fieldset>
-      <button type="submit" class="bouton plein grand" id="bouton-enregistrer">Enregistrer le paiement</button>
-      <p class="message" id="message-paiement" role="status" hidden></p>
-    </form>
+      <button type="button" class="lien" id="grille-aujourdhui">Ce mois-ci</button>
+    </div>
+    <p class="sous-titre" id="grille-sous-titre"></p>
+    <p class="message" id="message-grille" role="status" hidden></p>
+    <section class="carte grille-carte" aria-labelledby="grille-titre">
+      <h2 class="invisible" id="grille-titre">Tableau de caisse</h2>
+      <div class="tableau-defile grille-defile">
+        <table class="grille" id="grille">
+          <thead id="grille-tete"></thead>
+          <tbody id="grille-corps"></tbody>
+          <tfoot id="grille-pied"></tfoot>
+        </table>
+      </div>
+    </section>
+    <p class="aide-grille">Touchez une case pour ajouter des séances ou voir le détail.</p>
 
-    <section class="carte">
+    <section class="carte" id="bloc-jour" hidden>
       <div class="titre-ligne">
-        <h2>Paiements d'aujourd'hui</h2>
+        <h2>Saisies d'aujourd'hui</h2>
         <button type="button" class="lien" id="actualiser-jour">Actualiser</button>
       </div>
       <ul class="liste" id="liste-jour"></ul>
@@ -98,6 +99,7 @@
 
   <!-- Tableau de bord (direction) -->
   <main class="contenu large" id="vue-tableau" hidden>
+    <h1 class="grand-titre">Analyse</h1>
     <div class="filtres">
       <div class="segments" role="group" aria-label="Période">
         <button type="button" class="segment" data-periode="jour" aria-pressed="true">Jour</button>
@@ -131,6 +133,10 @@
       <div class="chiffre">
         <span class="chiffre-libelle">Annulés</span>
         <span class="chiffre-valeur" id="annules">–</span>
+      </div>
+      <div class="chiffre">
+        <span class="chiffre-libelle" id="libelle-part">Part de la thérapeute</span>
+        <span class="chiffre-valeur" id="part-t">–</span>
       </div>
     </section>
 
@@ -199,6 +205,41 @@
 </div>
 
 <div class="infobulle" id="infobulle" role="tooltip" hidden></div>
+
+<!-- Fenêtre d'une case du tableau -->
+<div class="voile voile-feuille" id="voile-case" hidden>
+  <form class="feuille" id="form-case" role="dialog" aria-modal="true" aria-labelledby="titre-case" novalidate>
+    <div class="feuille-tete">
+      <div>
+        <h2 id="titre-case">Soin</h2>
+        <p class="doux" id="date-case"></p>
+      </div>
+      <button type="button" class="fermer" id="fermer-case" aria-label="Fermer"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+    </div>
+    <ul class="liste liste-case" id="liste-case"></ul>
+    <div class="groupe-ios">
+      <div class="ligne-ios" id="ligne-nombre">
+        <label for="nombre-seances">Séances</label>
+        <div class="stepper">
+          <button type="button" id="moins" aria-label="Une séance de moins">−</button>
+          <input id="nombre-seances" type="text" inputmode="numeric" autocomplete="off" value="1" maxlength="2">
+          <button type="button" id="plus" aria-label="Une séance de plus">+</button>
+        </div>
+      </div>
+      <div class="ligne-ios">
+        <label for="prix" id="label-prix">Prix d'une séance</label>
+        <div class="champ-prix"><input id="prix" type="text" inputmode="decimal" autocomplete="off" placeholder="0"><span>DT</span></div>
+      </div>
+    </div>
+    <fieldset>
+      <legend class="etiquette">Mode de paiement</legend>
+      <div class="choix" id="choix-mode-case"></div>
+    </fieldset>
+    <p class="total-case" id="total-case" aria-live="polite"></p>
+    <button type="submit" class="bouton plein grand" id="bouton-ajouter">Ajouter</button>
+    <p class="message" id="message-case" role="status" hidden></p>
+  </form>
+</div>
 
 <!-- Fenêtre d'annulation -->
 <div class="voile" id="voile-annulation" hidden>
