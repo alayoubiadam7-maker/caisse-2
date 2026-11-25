@@ -190,12 +190,12 @@
     construireChoix('choix-mode-case', 'mode-case', etat.modes);
     $('libelle-part').textContent = 'Part de ' + etat.therapeute;
     $('onglets').hidden = r.role !== 'direction';
-    $('bloc-securite').hidden = r.role !== 'direction';
+    $('bloc-securite').hidden = r.role !== 'direction' || r.nom === 'Gérant';
     $('filtres-grille').hidden = r.role !== 'direction';
     $('bloc-jour').hidden = r.role === 'direction';
     etat.grilleMois = aujourdhuiISO().slice(0, 7);
     afficherVue('grille');
-    if (r.role === 'direction') chargerSecurite();
+    if (r.role === 'direction' && r.nom !== 'Gérant') chargerSecurite();
   }
 
   // ----- Carte Face ID : nombre d'appareils, ajout d'un appareil -----
